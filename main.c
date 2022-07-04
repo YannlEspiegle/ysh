@@ -1,16 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <wait.h>
-
-void ysh_loop(void);
-char *ysh_read_line(void);
-char **ysh_get_args(char *);
-int ysh_launch(char **);
+#include "main.h"
+#include "commands.h"
 
 int main(int argc, char *argv[]) {
-
   ysh_loop();
 
   return EXIT_SUCCESS;
@@ -25,14 +16,12 @@ void ysh_loop() {
     printf("> ");
     line = ysh_read_line();
     args = ysh_get_args(line);
-    status = ysh_launch(args);
+    status = ysh_execute(args);
 
     free(line);
     free(args);
   } while (status);
 }
-
-#define YSH_RL_BUFSIZE 1024
 
 char *ysh_read_line(void) {
   size_t bufsize = YSH_RL_BUFSIZE;
@@ -43,31 +32,28 @@ char *ysh_read_line(void) {
     exit(EXIT_FAILURE);
   }
 
-  int c, i;
+  int c, i = 0;
 
-  for (i = 0;; i++) {
-    // reallocate if buffer too short
-    if (i >= bufsize) {
-      bufsize += YSH_RL_BUFSIZE;
-      buffer = realloc(buffer, bufsize);
-      if (!buffer) {
-        fprintf(stderr, "ysh : allocation error");
-        exit(EXIT_FAILURE);
-      }
-    }
-
-    // get the current line
+  while (1) {
     if ((c = getchar()) == EOF || c == '\n') {
-      buffer[i] = c;
+      buffer[i] = '\0';
       return buffer;
     } else {
       buffer[i] = c;
     }
+    i++;
+
+    // If we have exceeded the buffer, reallocate.
+    if (i >= bufsize) {
+      bufsize += YSH_RL_BUFSIZE;
+      buffer = realloc(buffer, bufsize);
+      if (!buffer) {
+        fprintf(stderr, "ysh: allocation error\n");
+        exit(EXIT_FAILURE);
+      }
+    }
   }
 }
-
-#define YSH_ARGS_BUFSIZE 64
-#define YSH_ARGS_DELIM " \r\t\n\a"
 
 char **ysh_get_args(char *line) {
   size_t bufsize = YSH_ARGS_BUFSIZE;
@@ -100,13 +86,24 @@ char **ysh_get_args(char *line) {
   return tokens;
 }
 
+int ysh_execute(char **args) {
+  if (args[0] == NULL)
+    return 1;
+  for (int i = 0; i < NB_BUILTINS; i++) {
+    if (strcmp(args[0], builtin_str[i]) == 0)
+      return (*builtin_func[i])(args);
+  }
+
+  return ysh_launch(args);
+}
+
 int ysh_launch(char **args) {
-  pid_t pid, wpid;
+  pid_t pid;
   int status;
 
   pid = fork();
-  if(pid == 0) {
-    if(execvp(args[0], args) == -1) {
+  if (pid == 0) {
+    if (execvp(args[0], args) == -1) {
       perror("ysh");
     }
     exit(EXIT_FAILURE);
@@ -114,8 +111,8 @@ int ysh_launch(char **args) {
     perror("ysh");
   } else {
     do {
-      wpid = waitpid(pid, &status, WUNTRACED);
-    } while (!WIFEXITED(status) && ! WIFSIGNALED(status));
+      waitpid(pid, &status, WUNTRACED);
+    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }
 
   return 1;
