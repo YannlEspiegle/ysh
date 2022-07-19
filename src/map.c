@@ -30,16 +30,18 @@ extern char *ysh_get(char *key) {
 }
 
 extern int ysh_unset(char *key) {
-  int h = hash(key);
+  int h = hash(key) % TAILLE_TABLE;
   struct node *n;
   if ((n = elem(key, h))) {
 
-    if (!n->prev) {
+    if (!n->prev) { // if n is the head
       table[h] = n->next;
-      n->next->prev = NULL;
-    } else if (!n->next) {
+      if (n->next) // here we take care of the singleton case
+        n->next->prev = NULL;
+    }
+    else if (!n->next) { // if n is the last
       n->prev->next = NULL;
-    } else {
+    } else { // if in the middle
       n->prev->next = n->next;
       n->next->prev = n->prev;
     }
