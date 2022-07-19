@@ -7,8 +7,8 @@
 
 #define NB_BUILTINS 2
 
-int ysh_cd(char**);
-int ysh_exit(char**);
+extern int ysh_cd(char**);
+extern int ysh_exit(char**);
 
 extern char *builtin_str[];
 extern int (*builtin_func[]) (char**);
