@@ -1,5 +1,8 @@
 #include "main.h"
 #include "commands.h"
+#include <signal.h>
+#include <stdio.h>
+#include <time.h>
 
 int main(int argc, char *argv[]) {
   ysh_loop();
@@ -97,8 +100,13 @@ int ysh_execute(char **args) {
   return ysh_launch(args);
 }
 
+pid_t pid;
+
+void INTHandler_kill(int signum) {
+  kill(pid, signum);
+}
+
 int ysh_launch(char **args) {
-  pid_t pid;
   int status;
 
   pid = fork();
@@ -111,9 +119,11 @@ int ysh_launch(char **args) {
     perror("ysh");
   } else {
     do {
+      signal(SIGINT, INTHandler_kill);
       waitpid(pid, &status, WUNTRACED);
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
   }
 
   return 1;
 }
+
